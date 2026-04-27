@@ -220,14 +220,14 @@ class AppointmentEngine:
             'requires_action': False
         }
     
-    def _extract_doctor_id(self, message: str, doctors: List[Dict]) -> Optional[int]:
+    def _extract_doctor_id(self, message: str, doctors: List[Dict]) -> Optional[str]:
         """Extract doctor ID from message"""
-        # Check for number
+        # Check for number (1-7 maps to doctor index)
         match = re.search(r'\b(\d+)\b', message)
         if match:
-            doctor_id = int(match.group(1))
-            if any(d['id'] == doctor_id for d in doctors):
-                return doctor_id
+            doctor_num = int(match.group(1))
+            if 1 <= doctor_num <= len(doctors):
+                return doctors[doctor_num - 1]['id']  # Return MongoDB _id string
         
         # Check for specialty match
         message_lower = message.lower()
@@ -307,11 +307,12 @@ class AppointmentEngine:
                 'action_type': 'collect_appointment_id'
             }
     
-    def book_appointment(self, patient_name: str, doctor_id: int, 
+    def book_appointment(self, patient_name: str, doctor_id: str, 
                         date: str, time: str, phone: str = None, 
                         reason: str = None) -> Dict:
         """
         Book an appointment (RULE-BASED - NO AI)
+        doctor_id is now a MongoDB ObjectId string
         """
         # Validate inputs
         if not all([patient_name, doctor_id, date, time]):
@@ -345,7 +346,7 @@ class AppointmentEngine:
             'appointment_id': appointment_id
         }
     
-    def get_available_slots(self, doctor_id: int, date: str) -> List[str]:
+    def get_available_slots(self, doctor_id: str, date: str) -> List[str]:
         """Get available time slots for a doctor on a specific date"""
         # Get existing appointments
         booked_slots = self.db.get_appointments_by_doctor_date(doctor_id, date)
@@ -375,11 +376,11 @@ class AppointmentEngine:
         
         return slots
     
-    def _is_slot_available(self, doctor_id: int, date: str, time: str) -> bool:
+    def _is_slot_available(self, doctor_id: str, date: str, time: str) -> bool:
         """Check if a time slot is available"""
         available_slots = self.get_available_slots(doctor_id, date)
         return time in available_slots
     
-    def cancel_appointment(self, appointment_id: int) -> bool:
-        """Cancel an appointment"""
+    def cancel_appointment(self, appointment_id: str) -> bool:
+        """Cancel an appointment (MongoDB ObjectId string)"""
         return self.db.cancel_appointment(appointment_id)
